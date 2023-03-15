@@ -13,20 +13,31 @@ import matplotlib.pyplot as plt
 def generate_error(sqrt_variance, amount_tests):
     return np.random.normal(0, sqrt_variance, amount_tests)
 
-def func():
-    pass
 
-def calculate_info_mat(factors, weights):
+def func(x, theta):
+    return np.array(
+        [model_func_eta(x, theta) / theta[0],
+         np.math.log(theta[1]) * model_func_eta(x, theta),
+         np.math.log(theta[2]) * model_func_eta(x, theta),
+         np.math.log(theta[3]) * model_func_eta(x, theta)
+         ]
+    )
+
+
+def calculate_info_mat(factors, weights, theta):
     info_mat_tmp = np.array(
-        [np.dot(p, np.vstack(model(x[0], x[1])) @ np.vstack(model(x[0], x[1])).T) for x, p in zip(factors, weights)]
+        [p @ func(x, theta) @ func(x, theta).T for x, p in zip(factors, weights)]
     )
     return np.sum(info_mat_tmp, axis=0)
+
 
 def D_functional(plan):
     return np.linalg.det(calculate_info_mat(plan['x'], plan['p']))
 
-def calculate_variance(x, info_mat):
-    return model(x[0], x[1]) @ np.linalg.inv(info_mat) @ model(x[0], x[1]).T
+
+def calculate_variance(x, info_mat, theta):
+    return func(x, theta) @ np.linalg.inv(info_mat) @ func(x, theta).T
+
 
 def draw_plan(x, title):
     fig = plt.figure()
@@ -43,6 +54,7 @@ def draw_plan(x, title):
 theta_true = np.array([0.1, 0.3, 0.5, 0.1])  # Сумма тет = 1 -- постоянная отдача
 x_min, x_max = 0, 10  # Пределы изменения ресурсов
 noise_lvl = 0.15  # Уровень шума
+
 
 def model_func_eta(x, theta):
     return theta[0] * x[0] ** theta[1] * x[1] ** theta[2] * x[2] ** theta[3]
@@ -80,14 +92,14 @@ model = {
 # Сначала приведем к линейной модели
 X = np.array(list(map(lambda x: [1.0, np.math.log(x[0]), np.math.log(x[1]), np.math.log(x[2])], model['x'])))
 
-# Используем МНК-оценку
+# Используем МНК-оценку TODO: плохо работает, найти проблему
 model['theta_hat'] = np.linalg.inv(X.T @ X) @ X.T @ model['y']
 model['theta_hat'][0] = np.math.e ** model['theta_hat'][0]  # Обратить переход к линейной модели
 
 # %% Построим D-оптимальный план из начального
 
 cur_plan = plan.copy()
-# cur_info_mat = calculate_info_mat(cur_plan['x'], cur_plan['p'])
+cur_info_mat = calculate_info_mat(cur_plan['x'], cur_plan['p'], theta_true)
 
 iteration = 0
 while True:
@@ -107,7 +119,7 @@ while True:
     picked_x_s_index = np.where(cur_variance_s == max_variance)[0]
     picked_x_s_index = picked_x_s_index[:1][0]
     # Перестраиваем план
-    tmp = x_s[picked_x_s_index].reshape(1,2)
+    tmp = x_s[picked_x_s_index].reshape(1, 2)
     cur_plan['x'] = np.append(cur_plan['x'], x_s[picked_x_s_index].reshape(1, 2), axis=0)
     cur_plan['N'] += 1
     cur_plan['p'] = 1 / cur_plan['N'] * np.ones(cur_plan['N'])
