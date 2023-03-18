@@ -36,12 +36,13 @@ def D_functional(plan):
 
 
 def calculate_variance(x, info_mat, theta):
-    return func(x, theta) @ np.linalg.inv(info_mat) @ func(x, theta).T
+    return np.vstack(func(x, theta)).T @ np.linalg.inv(info_mat) @ np.vstack(func(x, theta))
 
 
 def draw_plan(x, title):
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
+    plt.title(title)
     ax.scatter(x[0], x[1], x[2])
     ax.set_xlabel('X1')
     ax.set_ylabel('X2')
@@ -63,7 +64,9 @@ def model_func_eta(x, theta):
 # %% Задаем начальный план
 
 N = 18  # Число наблюдений
-grid = np.linspace(x_min, x_max, 1001)
+size_grid = 1001
+grid = np.linspace(x_min, x_max, size_grid)
+
 x = np.array(list(map(lambda x: [np.random.choice(grid), np.random.choice(grid), np.random.choice(grid)], range(N))))
 plan = {
     'x': x,
@@ -110,7 +113,7 @@ while True:
 
     # Найдем значение дисперсии в точках вне плана
     cur_variance_s = np.array(
-        [calculate_variance(x, cur_info_mat)
+        [calculate_variance(x, cur_info_mat, theta_true)
          for x in x_s]
     )
 
@@ -119,16 +122,16 @@ while True:
     picked_x_s_index = np.where(cur_variance_s == max_variance)[0]
     picked_x_s_index = picked_x_s_index[:1][0]
     # Перестраиваем план
-    tmp = x_s[picked_x_s_index].reshape(1, 2)
-    cur_plan['x'] = np.append(cur_plan['x'], x_s[picked_x_s_index].reshape(1, 2), axis=0)
+    tmp = x_s[picked_x_s_index].reshape(1, 3)
+    cur_plan['x'] = np.append(cur_plan['x'], x_s[picked_x_s_index].reshape(1, 3), axis=0)
     cur_plan['N'] += 1
     cur_plan['p'] = 1 / cur_plan['N'] * np.ones(cur_plan['N'])
-    cur_info_mat = calculate_info_mat(cur_plan['x'], cur_plan['p'])
+    cur_info_mat = calculate_info_mat(cur_plan['x'], cur_plan['p'], theta_true)
 
     # Удалим точку с минимальной дисперсией из текущего плана
     x_j = cur_plan['x']
     cur_variance_j = np.array(
-        [calculate_variance(x, cur_info_mat)
+        [calculate_variance(x, cur_info_mat, theta_true)
          for x in x_j]
     )
 
@@ -141,7 +144,7 @@ while True:
     cur_plan['N'] -= 1
     cur_plan['p'] = 1 / cur_plan['N'] * np.ones(cur_plan['N'])
     cur_info_mat = calculate_info_mat(
-        cur_plan['x'], cur_plan['p'])
+        cur_plan['x'], cur_plan['p'], theta_true)
 
     if picked_x_s_index == picked_x_j_index or iteration == 2000:
         break
