@@ -17,22 +17,22 @@ def generate_error(sqrt_variance, amount_tests):
 def func(x, theta):
     return np.array(
         [model_func_eta(x, theta) / theta[0],
-         np.math.log(theta[1]) * model_func_eta(x, theta),
-         np.math.log(theta[2]) * model_func_eta(x, theta),
-         np.math.log(theta[3]) * model_func_eta(x, theta)
+         np.math.log(x[0]) * model_func_eta(x, theta),
+         np.math.log(x[1]) * model_func_eta(x, theta),
+         np.math.log(x[2]) * model_func_eta(x, theta)
          ]
     )
 
 
 def calculate_info_mat(factors, weights, theta):
     info_mat_tmp = np.array(
-        [p @ func(x, theta) @ func(x, theta).T for x, p in zip(factors, weights)]
+        [p * (np.vstack(func(x, theta)) @ np.vstack(func(x, theta)).T) for x, p in zip(factors, weights)]
     )
     return np.sum(info_mat_tmp, axis=0)
 
 
 def D_functional(plan):
-    return np.linalg.det(calculate_info_mat(plan['x'], plan['p']))
+    return np.linalg.det(calculate_info_mat(plan['x'], plan['p'], theta_true))
 
 
 def calculate_variance(x, info_mat, theta):
@@ -107,9 +107,8 @@ cur_info_mat = calculate_info_mat(cur_plan['x'], cur_plan['p'], theta_true)
 iteration = 0
 while True:
     # Выберем точки, не содержащиеся в плане
-    x_s = np.array(
-        [elem for elem in np.random.permutation(grid) if elem not in cur_plan['x']]
-    )
+    x_tmp = np.array(list(map(lambda x: [np.random.choice(grid), np.random.choice(grid), np.random.choice(grid)], range(size_grid))))
+    x_s = np.array([x for x in x_tmp if x not in cur_plan['x'] and x[0] != 0 and x[1] != 0 and x[2] != 0])
 
     # Найдем значение дисперсии в точках вне плана
     cur_variance_s = np.array(
