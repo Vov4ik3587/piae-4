@@ -95,7 +95,7 @@ model = {
 # Сначала приведем к линейной модели
 X = np.array(list(map(lambda x: [1.0, np.math.log(x[0]), np.math.log(x[1]), np.math.log(x[2])], model['x'])))
 
-# Используем МНК-оценку TODO: плохо работает, найти проблему
+# Используем МНК-оценку
 model['theta_hat'] = np.linalg.inv(X.T @ X) @ X.T @ model['y']
 model['theta_hat'][0] = np.math.e ** model['theta_hat'][0]  # Обратить переход к линейной модели
 
@@ -174,6 +174,12 @@ opt_model = {
 # Сначала приведем к линейной модели
 X = np.array(list(map(lambda x: [1.0, np.math.log(x[0]), np.math.log(x[1]), np.math.log(x[2])], opt_model['x'])))
 
-# Используем МНК-оценку TODO: плохо работает, найти проблему
+# Используем МНК-оценку
 opt_model['theta_hat'] = np.linalg.inv(X.T @ X) @ X.T @ opt_model['y']
 opt_model['theta_hat'][0] = np.math.e ** opt_model['theta_hat'][0]  # Обратить переход к линейной модели
+
+# %% Сравним оценки параметров модели из начального и оптимального планов с истинными значениями
+
+print(f'Истинные значения параметров тета: {theta_true}')
+print(f"Оценка значений параметров тета начального плана: {model['theta_hat']}")
+print(f"Оценка значений параметров тета локально-оптимального плана: {opt_model['theta_hat']}")
