@@ -76,7 +76,7 @@ plan = {
 
 draw_plan(plan['x'].T, 'Начальный план')
 
-# %% Задаем модель на основе плана
+# %% Задаем модель на основе начального плана
 
 model_x = plan['x']
 signal = np.array([model_func_eta(x, theta_true) for x in model_x])  # Вычисляем сигнал
@@ -151,3 +151,29 @@ while True:
 
 end_plan = cur_plan.copy()
 draw_plan(end_plan['x'].T, 'Оптимальный план')
+
+# %% Сравним значение D-функционалов начального плана и оптимального
+
+print(f'D start plan = {D_functional(plan)}')
+print(f'D start plan = {D_functional(end_plan)}')
+
+# %% На основе оптимального плана проведем эксперимент (пункт 6 методы)
+
+opt_model_x = end_plan['x']
+signal = np.array([model_func_eta(x, theta_true) for x in opt_model_x])  # Вычисляем сигнал
+power = np.vdot(signal - np.mean(signal), signal - np.mean(signal)) / len(signal)  # Вычисляем полезную мощность сигнала
+variance = power * noise_lvl  # Зашумляем
+response = signal + generate_error(np.sqrt(variance), N)  # Вычисляем отклик
+
+opt_model = {
+    'x': opt_model_x,
+    'y': response,
+    'theta_hat': []
+}
+
+# Сначала приведем к линейной модели
+X = np.array(list(map(lambda x: [1.0, np.math.log(x[0]), np.math.log(x[1]), np.math.log(x[2])], opt_model['x'])))
+
+# Используем МНК-оценку TODO: плохо работает, найти проблему
+opt_model['theta_hat'] = np.linalg.inv(X.T @ X) @ X.T @ opt_model['y']
+opt_model['theta_hat'][0] = np.math.e ** opt_model['theta_hat'][0]  # Обратить переход к линейной модели
