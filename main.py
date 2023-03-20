@@ -14,6 +14,42 @@ def generate_error(sqrt_variance, amount_tests):
     return np.random.normal(0, sqrt_variance, amount_tests)
 
 
+def experiment(plan, true_theta):
+    ARSS = 0
+    Ahead = 0
+    Num = 100
+    for _ in range(Num):
+        Y = calculate_response(plan, true_theta)
+        # Y = np.log(Y)
+        X = np.array(list(map(lambda x: [1.0, np.math.log(x[0]), np.math.log(x[1]), np.math.log(x[2])], plan)))
+        theta_hat = OLS(X, Y)
+        ARSS += RSS(Y, X, theta_hat)
+        Ahead += np.dot(theta_hat - true_theta, theta_hat - true_theta)
+    ARSS /= Num
+    Ahead /= Num
+    return ARSS, Ahead
+
+
+def OLS(xf, y):
+    theta_hat = np.linalg.inv(xf.T @ xf) @ xf.T @ y
+    theta_hat[0] = np.math.e ** theta_hat[0]
+    return theta_hat
+
+
+def calculate_response(X, theta):
+    signal = np.array([model_func_eta(x, theta) for x in X])  # Вычисляем сигнал
+    power = np.vdot(signal - np.mean(signal), signal - np.mean(signal)) / len(
+        signal)  # Вычисляем полезную мощность сигнала
+    variance = power * noise_lvl  # Зашумляем
+    response = signal + generate_error(np.sqrt(variance), N)  # Вычисляем отклик
+    return response
+
+
+def RSS(y, x, theta_hat):
+    y_hat = np.dot(x, theta_hat)
+    return np.dot(y - y_hat, y - y_hat)
+
+
 def func(x, theta):
     return np.array(
         [model_func_eta(x, theta) / theta[0],
@@ -79,14 +115,10 @@ draw_plan(plan['x'].T, 'Начальный план')
 # %% Задаем модель на основе начального плана
 
 model_x = plan['x']
-signal = np.array([model_func_eta(x, theta_true) for x in model_x])  # Вычисляем сигнал
-power = np.vdot(signal - np.mean(signal), signal - np.mean(signal)) / len(signal)  # Вычисляем полезную мощность сигнала
-variance = power * noise_lvl  # Зашумляем
-response = signal + generate_error(np.sqrt(variance), N)  # Вычисляем отклик
 
 model = {
     'x': model_x,
-    'y': response,
+    'y': calculate_response(model_x, theta_true),
     'theta_hat': []
 }
 
@@ -107,7 +139,8 @@ cur_info_mat = calculate_info_mat(cur_plan['x'], cur_plan['p'], theta_true)
 iteration = 0
 while True:
     # Выберем точки, не содержащиеся в плане
-    x_tmp = np.array(list(map(lambda x: [np.random.choice(grid), np.random.choice(grid), np.random.choice(grid)], range(size_grid))))
+    x_tmp = np.array(
+        list(map(lambda x: [np.random.choice(grid), np.random.choice(grid), np.random.choice(grid)], range(size_grid))))
     x_s = np.array([x for x in x_tmp if x not in cur_plan['x'] and x[0] != 0 and x[1] != 0 and x[2] != 0])
 
     # Найдем значение дисперсии в точках вне плана
@@ -145,7 +178,7 @@ while True:
     cur_info_mat = calculate_info_mat(
         cur_plan['x'], cur_plan['p'], theta_true)
 
-    if picked_x_s_index == picked_x_j_index or iteration == 2000:
+    if picked_x_s_index == picked_x_j_index or iteration == 50:
         break
     iteration += 1
 
@@ -153,21 +186,17 @@ end_plan = cur_plan.copy()
 draw_plan(end_plan['x'].T, 'Оптимальный план')
 
 # %% Сравним значение D-функционалов начального плана и оптимального
-
+print(f'Количество итераций: {iteration}')
 print(f'D start plan = {D_functional(plan)}')
 print(f'D start plan = {D_functional(end_plan)}')
 
-# %% На основе оптимального плана проведем эксперимент (пункт 6 методы)
+# %% Найдем оценку параметров модели на оптимальном плане
 
 opt_model_x = end_plan['x']
-signal = np.array([model_func_eta(x, theta_true) for x in opt_model_x])  # Вычисляем сигнал
-power = np.vdot(signal - np.mean(signal), signal - np.mean(signal)) / len(signal)  # Вычисляем полезную мощность сигнала
-variance = power * noise_lvl  # Зашумляем
-response = signal + generate_error(np.sqrt(variance), N)  # Вычисляем отклик
 
 opt_model = {
     'x': opt_model_x,
-    'y': response,
+    'y': calculate_response(opt_model_x, theta_true),
     'theta_hat': []
 }
 
@@ -183,3 +212,19 @@ opt_model['theta_hat'][0] = np.math.e ** opt_model['theta_hat'][0]  # Обрат
 print(f'Истинные значения параметров тета: {theta_true}')
 print(f"Оценка значений параметров тета начального плана: {model['theta_hat']}")
 print(f"Оценка значений параметров тета локально-оптимального плана: {opt_model['theta_hat']}")
+
+# %% Пункт 6. Проведем эксперимент
+
+ARSS_start_plan, Ahead_start_plan = experiment(plan['x'], theta_true)
+ARSS_opt_plan, Ahead_opt_plan = experiment(end_plan['x'], theta_true)
+
+print('Начальный план')
+print(f"Точки плана: {plan['x']}")
+print(f"Среднее значение RSS: {ARSS_start_plan}")
+print(f"Среднее значение нормы RSS: {Ahead_start_plan}")
+
+print('Локально-оптимальный план план')
+print(f"Точки плана: {end_plan['x']}")
+print(f"Среднее значение RSS: {ARSS_opt_plan}")
+print(f"Среднее значение нормы RSS: {Ahead_opt_plan}")
+
